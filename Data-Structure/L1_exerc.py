@@ -1,6 +1,3 @@
-### Integrante:
-# Juan Lucas Montanaro, nºUSp: 11912787
-
 from copy import deepcopy
 
 
