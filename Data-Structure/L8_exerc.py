@@ -1,7 +1,5 @@
 """
 Lista 8
-Componentes do grupo :
-NUSP : 11912787
 
   Programa que cria uma arvore de decisoes a partir de dados
 passados pelo usuario e busca um resultado dentro dela, dado
