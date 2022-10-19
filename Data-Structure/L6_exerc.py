@@ -1,7 +1,4 @@
 """ Lista 6
-
-Componentes do grupo:
-    NUSP: 11912787
     
   Programa que, dada uma chave, criptografa uma mensagem do usuario com o metodo
 de cesar e também coloca '*' a cada tres caracteres.
