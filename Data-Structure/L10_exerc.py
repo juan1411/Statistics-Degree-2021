@@ -1,7 +1,5 @@
 """
 Lista 10
-Componentes do grupo :
-NUSP : 11912787
 
   Programa que le um arquivo 'dicio.txt' para criar um dicionario em formato de
 arvore binaria, que considera o criterio de ordem alfabetica para inserir os nos.
