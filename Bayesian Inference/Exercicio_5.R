@@ -1,6 +1,5 @@
 # SME0809 - Exercicio: Agricultura x Urbano
 #Nome: Juan L. Montanaro
-#N. USP: 11912787
 
 # Dados:
 z <- c(rep(0,5), rep(1,5))
