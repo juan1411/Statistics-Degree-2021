@@ -1,0 +1,10 @@
+abandon,abandono
+ability,habilidade
+able,capaz
+above,acima
+absence,ausencia
+absolute,absoluto
+about,sobre
+academic,academico
+access,acesso
+accurate,preciso
