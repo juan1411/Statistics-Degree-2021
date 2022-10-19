@@ -155,7 +155,7 @@ $$L(\lambda, t) = \prod_{i=1}^n f_T(t_i) = \prod_{i=1}^n \lambda e^{-\lambda t_i
 ```{r Data, message=FALSE, warning=FALSE}
 library(readxl)
 
-dados <- read_excel('C:/Juan - Usp/4º Semestre/Inferência Bayesiana/P1/Oldest.xls',
+dados <- read_excel('4º Semestre/Inferência Bayesiana/P1/Oldest.xls',
                     sheet = 1)[, c(8, 10, 11, 12, 14, 17)]
 head(dados)
 ```
