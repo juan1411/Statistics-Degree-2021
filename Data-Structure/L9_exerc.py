@@ -1,7 +1,5 @@
 """
 Lista 9
-Componentes do grupo :
-NUSP : 11912787
 
   Programa que constroi uma arvore binaria a partir de uma entrada de dado, cuja forma
 eh bem especifica: abre parenteses, o nome de um conjunto, uma operacao, o nome do outro
