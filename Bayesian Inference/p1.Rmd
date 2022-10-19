@@ -1,0 +1,386 @@
+---
+title: "SME0809 - Inferência Bayesiana"
+output: pdf_document
+---
+
+#### Nome: Juan Lucas Montanaro, nºUSP: 11912787
+
+# Prova 1 - Parte Prática
+
+### Sumário
+  
+* Introdução
+* Distribuições _a priori_
+    + Modelos para o parâmetro
+    + Resumos _a priori_
+* Distribuições _a posteriori_
+    + Dados observados
+    + Densidades e gráficos
+    + Resumos _a posteriori_
+* Funções Preditivas
+
+## Introdução
+
+  Para o complemento da nota da primeira prova desta matéria, foi pedido um relatório aplicando todas as técnicas e teorias vistas em aula em um conjunto de dados que, no meu caso, tivesse sido modelado de acordo com uma distribuição exponencial, ou seja, modelar o parâmetro de interesse de acordo com uma distribuição _a priori_, encontrar a função da distribuição _a posteriori_, comparar gráficos e medidas estatíticas, encontrar a função preditiva e por último, montar um resumo.
+  
+  Então, após pesquisar, encontrei o paper "COAD, A. Investigating the Exponential Age Distribution of Firms. **Economics: The Open-Access**, Open-Assessment E-Journal, v.4, p.1–30, Maio 2010. disponível em: <http://dx.doi.org/10.5018/economics-ejournal.ja.2010-17> (acessado em: 16 de Outubro de 2021)", no qual é feita uma análise sobre o tempo de vida de uma empresa e, como está no título, é considerado o modelo exponencial como adequado ao problema.
+  
+  Desta forma, assim como é dito na seção 4 (p.11) do paper, considere $T$ a variável aleatória que descreve a distribuição das idades das empresas, $T \sim Exp(\lambda)$, então:
+  
+$$P(T = t) = \lambda e^{-\lambda t} \text{ , para t} \ge 0 \text{ e }\lambda \ge 0.$$
+
+  Isto é, "a probabilidade de uma empresa ter idade $t$ é $\lambda e^{-\lambda t}$, enquanto que a probabilidade de uma empresa ter idade $t+1$ é igual a $\lambda e^{-\lambda (t+1)} = \lambda e^{-\lambda t - \lambda} = \lambda e^{-\lambda t} e^{-\lambda}$, em que $e^{-\lambda}$ (está entre 0 e 1) é a taxa de sobrevivência; em outras palavras, a probabilidade de uma empresa sobreviver até a idade $t+1$ é igual à probabilidade de ela sobreviver até a idade $t$, multiplicada pela taxa de sobrevivência $r = e^{-\lambda}$" (p.11 do paper), e com isso, poderei modelar a incerteza relativa ao parâmetro $\lambda$.
+
+  Por último, antes de começar o relatório, encontrei os dados neste endereço: [link](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CUSSQM), e estarei analisando a planilha "Oldest-DATA" com as idades das empresas mais antigas do mundo todo.
+  
+## Distribuições _a priori_
+
+  Como citado na introdução, primeiro usarei a taxa de sobrenvivência, $r$, e depois farei a transformação de volta para o parâmetro $\lambda$. Além disso, também considerarei a distribuição não informativa de Jeffreys para o parâmetro.
+  
+### Modelos para o parâmetro
+
+  Assim, segundo Ross (2007), para $X$ e $Y$ variáveis aleatórias tais que $X = H(Y)$ para alguma função $H$, podemos usar a regra de transformação:
+  
+$$f_X(x) = f_Y(H^{-1}(x)) . \bigg|\frac{d}{dx}H^{-1}(x)\bigg|$$
+  Logo, considerando para $r$ uma distribuição uniforme e sabendo que $r = e^{-\lambda} \iff \lambda = -\ln r$, temos então:
+  
+$$r \sim U(0,1) \Rightarrow  \pi_A(\lambda) = 1.e^{-1\lambda}$$
+  Além disso, considere também uma segunda distribuição, a não informativa de Jeffreys:
+  
+$$\pi_B(\lambda) \propto \sqrt{J(\lambda)} = \sqrt{\frac{1}{\lambda^2}} = \frac{1}{\lambda}$$
+  
+  Ou seja, $\lambda_A \sim Exp(1)$ é a primeira distribuição _a priori_ considerada e $\pi_B(\lambda)$ a função da segunda.
+  
+### Resumos _a priori_
+
+  Para concluir esta parte, precisamos verificar o comportamento destas distribuições escolhidas. Então vejamos os gráficos:
+  
+```{r GrafsPri-A, fig.align='center'}
+set.seed(1208)
+
+# vetores suporte
+r <- seq(0, 1, 0.001)
+lambda <- seq(0, 6, 0.005)
+
+
+#graficos
+par(mfrow = c(1,2))
+
+#Priori A
+A.col = '#5200cc'
+
+plot(r, dunif(r, 0, 1), xlab = 'r: taxa de sobrevivência',
+     ylab = 'Densidade', type = 'l',
+     main = 'Gráfico de r')
+plot(lambda, dexp(lambda, 1),
+     xlab = expression(lambda), ylab = '', type = 'l',
+     main = 'Transformação para Lambda', col = A.col)
+```
+
+```{r GrafsPri-C, fig.align='center'}
+#Priori B
+B.col = '#008000'
+
+plot(lambda, 1/lambda, xlab = expression(lambda),
+     ylab = 'Densidade', type = 'l', col = B.col,
+     main = 'Distribuição de Jeffreys', xlim=c(0,2))
+
+#Ambos juntos:
+plot(lambda, dexp(lambda, 1), xlab = expression(lambda),
+     ylab = 'Densidades', col = A.col, type = 'l',
+     ylim = c(0, 2), xlim = c(0,6),
+     main = 'Distribuições a Priori',lwd=2)
+
+axis(2, col.axis=A.col, col=A.col)
+
+par(new=T)
+plot(lambda, 1/lambda, type= "l", axes=F, xlim=c(0,6),
+     frame=T, ann=F, col=B.col, ylim=c(0,2), lwd=2)
+
+axis(4, col.axis=B.col, col=B.col)
+
+legend(4.5, 1.75, legend = c('Exp(1)', 'Jeffreys'),
+       col = c(A.col, B.col), lwd = 2, cex=0.9)
+```
+
+  Observe que os gráficos, além de parecidos, atribuem chances maiores para valores menores de $\lambda$, conforme seu valor se aproxima de zero, maiores as densidades de probabilidade, o que implica diretamente numa alta taxa de sobrevivência, i.e., os modelos _a priori_ indicam que as empresas funcionarão por muito tempo.
+
+  Agora, uma tabela resumindo as principais estatísticas das distribuições; considere "IC" como "intervalo de credibilidade 95%", sendo o limite especificado por "_inf" e "_sup" para o inferior e superior respectivamente:
+  
+```{r tabPri, warning=FALSE}
+#Priori A
+A.med = 1
+A.var = 1
+A.mediana = round(median( pexp(lambda, 1) ), 4)
+A.moda = NA
+A.IC_inf = round( qexp(0.025, 1), 4)
+A.IC_sup = round( qexp(0.975, 1), 4)
+
+#Priori B
+B.med = NA
+B.var = NA
+B.mediana = NA
+B.moda = NA
+B.IC_inf = NA
+B.IC_sup = NA
+
+tab.Pri <- data.frame(media = c(A.med, B.med), 
+                  variancia = c(A.var, B.var),
+                  mediana=c(A.mediana, B.mediana),
+                  moda=c(A.moda, B.moda),
+                  IC_inf = c(A.IC_inf, B.IC_inf),
+                  IC_sup = c(A.IC_sup, B.IC_sup)
+)               
+
+row.names(tab.Pri) = c("Priori A", "Priori B")
+tab.Pri
+```
+
+  A tabela reafirma que os prováveis valores de $\lambda$ são pequenos. Além disso, por conta da distribuição _a priori_ de Jeffreys ser imprópria, não é possível calcular várias estatísticas, contudo, pelo menos, foi possível fazer uma análise do gráfico.
+  
+  Portanto, resumidamente as distruibuições _a priori_ consideradas indicam uma alta taxa de sobrevivência das empresas. Veremos então como as observações reais mudarão esta ideia.
+
+## Distribuições _a posteriori_
+
+  Nesta seção, vamos usar os dados disponíveis e atualizar nossa incerteza relativa ao parâmetro e verificar como eles influenciarão na taxa de sobrevivência das empresas.
+  
+### Dados observados
+  
+  Em primeiro lugar, é preciso encontrar a verossimilhança, $L(\lambda, t)$; assumindo que a idade de cada empresa é independente uma da outra, temos:
+  
+$$L(\lambda, t) = \prod_{i=1}^n f_T(t_i) = \prod_{i=1}^n \lambda e^{-\lambda t_i} = \lambda^n e^{-\lambda \sum_{i=1}^nt_i} = \lambda^n e^{-\lambda n \bar{t}}$$
+
+  Veja que $L(\lambda,t)$ é kernel de uma distribuição gama, i.e., $L(\lambda,t) \sim Gama(n-1, \sum_{i=1}^nt_i)$. Mas, por agora, o importante é carregar e analisar os dados:
+  
+```{r Data, message=FALSE, warning=FALSE}
+library(readxl)
+
+dados <- read_excel('C:/Juan - Usp/4º Semestre/Inferência Bayesiana/P1/Oldest.xls',
+                    sheet = 1)[, c(8, 10, 11, 12, 14, 17)]
+head(dados)
+```
+
+  Atente-se ao fato de que a empresa mais antigas do mundo em 2009 começou seus serviços no ano de $578$ e, na verdade, ainda hoje em 2021, algumas delas continuam oferecendo seus serviços, por exemplo, a pousada japonesa Hoshi continua fazendo reservas de quartos e atendendo clientes.
+  
+  Mas a nossa variável de interesse é a idade de cada empresa no ano de 2009 e antes de encontrarmos, de fato, as distribuições _a posteriori_, vamos considerar que $\frac{1}{\overline{T}}$ é um estimador para $\lambda$ e comparar a densidade dos dados com a densidade da distribuição $Exp\Big(\hat{\lambda} = \frac{1}{\overline{T}}\Big)$:
+  
+```{r AnalisExp, fig.align='center'}
+t = dados$`Age (2009-fdtn year)`
+summary(t)
+
+par(mfrow = c(1,2))
+
+dados.col = '#990033'
+
+boxplot(t, col = dados.col, ylab = 'Idade',
+        main = 'Boxplot das Idades')
+
+hist(t, freq = F, xlab = 'T: idade', ylab = 'Densidade',
+     col = dados.col, border = 'white',
+     main = "Distribuição das Idades")
+curve(dexp(x, 1/mean(t)), add= T, col =1)
+
+legend(650, 0.0035, col = c(dados.col, 1), pch = c(15, 18),
+       legend = c('Dens. das Idades', 'Dist. Aprox.: Média'),
+       cex = 0.7)
+```
+
+  Sobre as observações, primeiramente, há empresas muito velhas mas a grande maioria dos dados indica que elas funcionam até os $300$ anos - a média, a mediana e as regiões interquartis mostram valores pequenos em relação aos 1400 anos das empresas mais velhas -, dessa forma, vemos uma alta densidade de empresas no começo e poucas no final do histograma, assim como vários 'outliers' no gráfico de caixas.
+  
+  Em segundo lugar, uma distribuição exponencial parece se ajustar bem aos dados, porém, no próprio paper de referência, o autor ressalta que o modelo não se ajusta às idades das empresas no começo, há muito mais empresas "jovens" do que o modelo considera normal, mesmo assim, ele se aproxima bem para a distribuição das empresas antigas, ou seja, provavelmente, a taxa de sobrevivência seja baixa e não apresente uma distribuição uniforme, contrariando os modelos _a priori_.
+  
+  Ainda assim, seguiremos com o modelo exponencial para a distribuição das idades e os modelos _a priori_ já citados, esperando que, no final, os cálculos apontem para uma baixa taxa de sobrevivência.
+
+### Densidades e gráficos
+
+  Dessa vez, vamos encontrar a distribuição _a posteriori_ para cada modelo criado na seção anterior utilizando a função de verossimilhança e a regra geral: $\pi(\lambda|t) \propto L(\lambda|t).\pi(\lambda)$:
+  
+$$\pi_A(\lambda|t) \propto \lambda^n e^{-\lambda n\bar{t}} e^{-\lambda} = \lambda^n e^{-\lambda(n\bar{t} +1)}  \\                                                     \pi_B(\lambda|t) \propto \lambda^n e^{-\lambda n\bar{t}} \frac{1}{\lambda} = \lambda^{n-1} e^{-\lambda n\bar{t}}$$
+
+  Veja que as equações são kernel's de uma distribuição gama, ou seja, $\lambda_A|t \sim Gama(n+1, 1 + \sum_{i=1}^nt_i)$ e $\lambda_B|t \sim Gama(n, \sum_{i=1}^nt_i)$ são as distribuições _a posterioris_ encontradas.
+  
+  Então, vamos ver os comportamentos destas funções em gráfico:
+  
+```{r grafsPost, fig.align='center'}
+n = length(t)
+l = seq(0.003, 0.004, 0.0000001) #vetor auxiliar
+
+# Graficos:
+A.alp = n + 1
+A.bet = sum(t) + 1
+
+B.alp = n
+B.bet = sum(t)
+
+plot(l, dgamma(l, A.alp, A.bet), ylab = 'Densidades',
+     type = 'l', xlab = expression(lambda), lwd = 2,
+     xlim = c(0.0032,0.004), col = A.col,
+     main = "Distribuições a Posteriori")
+
+par(new=T)
+plot(l, dgamma(l, B.alp, B.bet), ylab = '',
+     type = 'l', xlab = '', col = B.col,
+     xlim = c(0.0032,0.004), lwd = 2, axes = F,
+     frame = T, ann=F, lty = 2)
+
+legend(0.00370, 4500, col = c(A.col, B.col), lwd = 2,
+       legend = c('Gama(1741,487842)','Gama(1740,487841)'),
+       cex = 0.75, lty = c(1,2))
+```
+
+  Então, a partir da análise dos gráficos, vemos que a verossimilhança concentra a densidade de $\lambda$ no ponto médio das distribuições: $0.00357$ aproximadamente. De fato, $\lambda_A$ foi modelado de acordo com uma distribuição uniforme de sobrevivência e a distribuição de Jeffreys é não informativa, então era esperado que ambos apresentassem o mesmo comportamento e também deixassem a verossimilhança influenciar quase totalmente a forma das distribuições, ou seja, o ponto médio do qual se aproximam é o resultado da presença da verossimilhança no modelo.
+  
+### Resumos _a posteriori_
+
+  Já foi visto, então, os gráficos das distribuições, agora, veremos a tabela resumindo as principais estatísticas e comparando com as distribuições _a priori_ consideradas. Lembrando que "IC" diz respeito ao intervalo de credibilidade 95%.
+  
+```{r tabPost}
+#Priori A
+A.med = round( A.alp/A.bet, 5)
+A.var = round( A.alp/A.bet^2, 5)
+A.mediana = round(qgamma(0.5, A.alp, A.bet), 5)
+A.moda = round( (A.alp-1)/A.bet, 5)
+A.IC_inf = round(qgamma(0.025, A.alp, A.bet), 5)
+A.IC_sup = round(qgamma(0.975, A.alp, A.bet), 5)
+
+#Priori B
+B.med = round( B.alp/B.bet, 5)
+B.var = round( B.alp/B.bet^2, 5)
+B.mediana = round(qgamma(0.5, n, B.bet), 5)
+B.moda = round( (B.alp-1)/B.bet, 5)
+B.IC_inf = round(qgamma(0.025, B.alp, B.bet), 5)
+B.IC_sup = round(qgamma(0.975, B.alp, B.bet), 5)
+
+tab.Post <- data.frame(media = c(A.med, B.med), 
+                  variancia = c(A.var, B.var),
+                  mediana = c(A.mediana, B.mediana),
+                  moda = c(A.moda, B.moda),
+                  IC_inf = c(A.IC_inf, B.IC_inf),
+                  IC_sup = c(A.IC_sup, B.IC_sup)
+)
+
+row.names(tab.Post) = c("Posteriori A", "Posteriori B")
+
+rbind(tab.Pri[1,], tab.Post[1,])
+
+rbind(tab.Pri[2,], tab.Post[2,])
+```
+
+  A presença dos dados no modelo é tão importante que, no caso de $\lambda_A$, diminuiu um intervalo de credibilidade do tamanho $3.68890-0.0253 = 3.6636$ para o tamanho $0.00374-0.0034 = 0.00034$, além disso, vemos que as estatísticas descritivas de ambos os modelos são aproximadamente iguais, ou seja, os estimadores para $\lambda$ baseados nas distribuições _a posteriori_ serão muito próximos entre si, pois as distribuições estão muito concentradas. 
+  
+```{r regHPD, warning=FALSE}
+library(TeachingDemos)
+
+#HPD A
+A.HPD_inf = round( hpd(qgamma, conf=0.95, shape=A.alp, rate=A.bet)[1], 5)
+A.HPD_sup = round( hpd(qgamma, conf=0.95, shape=A.alp, rate=A.bet)[2], 5)
+
+#HPD B
+B.HPD_inf = round( hpd(qgamma, conf=0.95, shape=B.alp, rate=B.bet)[1], 5)
+B.HPD_sup = round( hpd(qgamma, conf=0.95, shape=B.alp, rate=B.bet)[2], 5)
+
+tab.Post <- cbind(tab.Post,
+                  HPD_inf = c(A.HPD_inf, B.HPD_inf),
+                  HPD_sup = c(A.HPD_sup, B.HPD_sup))
+tab.Post
+```
+
+  Então, incluindo a região de densidade _a posteriori_ máxima (região HPD) 95% e comparando diretamente cada distribuição, vemos que elas acabaram se aproximando dos mesmo valores, assim como suas curvas no gráfico, pois seus hiperparâmetros são praticamente iguais.
+  Logo, poderíamos até mesmo descartar uma das distribuições e usar apenas a outra para estimar $\lambda$, porque seus valores são muito próximos.
+  
+  Por fim, vamos rever como ficou a distribuição da taxa de sobrevivência:
+  
+$$f_r(R) = f_{\lambda|t}(-\ln R).\bigg|\frac{-1}{R}\bigg|$$
+
+```{r grafSobrev, fig.align='center'}
+r = seq(0.996, 0.997, 0.000001)
+
+plot(r, dgamma(-log(r), A.alp, B.bet)/r,
+     type = 'l', xlab = 'r', ylab = '',
+     main = 'Densidade da Taxa de Sobrevivência') 
+```
+
+  Como o esperado pelos modelos _a priori_, a taxa de sobrevivência é bem alta, sendo na média igual a $r = e^{- \hat{\lambda}_{A|t}} = e^{-0.00357} \approx 0.99644$ (considerando a média de $\lambda_{A|t}$), mesmo os dados indicando que, ao longo do tempo, existem cada vez menos empresas. Na verdade, isto se deve ao fato de existerem empresas muito antigas nos dados, veja que todas têm mais de 150 anos e há nove com mais de 1000, valores os quais influenciam diretamente as medidas de $r$ e de $\lambda$, pois a variável $T$ começa a ser medida do zero. 
+  Portanto, visto que obtemos estes resultados, concluímos que para qualquer empresa, a taxa de sobrevivência média é aproximadamente 99.644% e considerando um modelo exponencial para a idade, o parâmetro desconhecido pode ser aproximado por 0.357%, funcionando melhor para empresas com mais antigas.
+
+## Funções Preditivas
+
+  Nesta última seção, melhorando a última conclusão, vamos calcular e verificar os gráficos das funções preditivas para a variável $T$. Lembrando que, para $X$ a variável preditora, sua função é dada por:
+  
+$$f_X(x|t) = \int f_T(x).\pi(\lambda|t) \ d\lambda = \int \pi(\lambda|t) \lambda e^{-\lambda x}\ d\lambda$$
+  E como todas as distribuições _a posterioris_ são $\lambda|t \sim Gama(s,p)$, com parâmetros $s$ e $p$ diferentes para cada uma, então a função de $X$ é:
+  
+$$f_{X}(x|t) = \frac{p^s}{\Gamma(s)} \int \lambda^{s-1}e^{-p\lambda} \lambda e^{-\lambda x}\ d\lambda  \\                                                       = \frac{p^s}{\Gamma(s)} \int \lambda^s e^{-\lambda (x+p)}\ d\lambda \\             = \frac{p^s}{\Gamma(s)} \frac{\Gamma(s+1)}{(x+p)^{s+1}} \\                         =\bigg(\frac{p}{x+r}\bigg)^s \bigg(\frac{s}{x+p}\bigg)$$
+
+  Vou já calcular a funçao massa de probabilidade também:
+  
+$$F_X(u|t) = \int_0^u \bigg(\frac{p}{x+p}\bigg)^s \bigg(\frac{s}{x+p}\bigg) dx \\  = s p^s \int_0^u \frac{1}{(x+p)^{s+1}}dx \\                                        = s p^s \frac{(-1)}{s} \bigg(\frac{1}{(u+p)^s} - \frac{1}{(0+p)^s} \bigg) \\       = 1 - \Big(\frac{p}{u+p}\Big)^s$$
+
+```{r fPred}
+dPred <- function(x,s,p){
+  #funcao preditiva
+  # x > 0, s > 0 e p > 0
+  aux = (p/(x+p))^s * (s/(x+p))
+  return(aux)
+}
+
+qPred <- function(u,s,p){
+  #quantil da funcao preditiva
+  #u: vetor de probabilidades
+  aux = (1-u)^(1/s)
+  return( p*(1/aux - 1) )
+}
+```
+
+  Agora, dada a função preditiva, vamos ver o gráfico de sua distribuição e um resumo com as principais estatísticas, assim como foi feito para as distribuições _a priori_ e _a posteriori_:
+  
+```{r Preicao, fig.align='center'}
+x = seq(0,1000, 0.1)
+
+plot(x, dPred(x, A.alp, A.bet), type='l', lwd=2,
+     xlab = 'T: idade', ylab = 'Probabilidade',
+     main = 'Distribuições Preditivas das Idades',
+     col = A.col)
+
+par(new=T)
+plot(x, dPred(x, B.alp, B.bet), type= 'l', lty = 2,
+     axes=F, frame=T, ann=F, lwd=4, col = B.col)
+
+legend(700, 0.0035, col=c(A.col, B.col), lwd=c(2,4),
+       lty=c(1,2), legend = c('lambda A', 'lambda B'))
+```
+
+```{r tabPred}
+med <- function(x,s,p){ x * dPred(x,s,p) }
+
+med2 <- function(x,s,p){ x^2 * dPred(x,s,p)}
+
+#Predicao para lambda_A:
+P.med.A = integrate(med, s=A.alp, p=A.bet, 0, Inf)$value
+P.var.A = integrate(med2, s=A.alp, p=A.bet, 0, Inf)$value - P.med.A^2
+P.ds.A = sqrt(P.var.A)
+P.mediana.A = qPred(0.5, A.alp, A.bet)
+P.IC.A_inf = qPred(0.025, A.alp, A.bet)
+P.IC.A_sup = qPred(0.975, A.alp, A.bet)
+
+#Predicao para lambda_B:
+P.med.B = integrate(med, s=B.alp, p=B.bet, 0, Inf)$value
+P.var.B = integrate(med2, s=B.alp, p=B.bet, 0, Inf)$value - P.med.B^2
+P.ds.B = sqrt(P.var.B)
+P.mediana.B = qPred(0.5, B.alp, B.bet)
+P.IC.B_inf = qPred(0.025, B.alp, B.bet)
+P.IC.B_sup = qPred(0.975, B.alp, B.bet)
+
+tab.Pred <- round(data.frame(media=c(P.med.A, P.med.B),
+                       var=c(P.var.A, P.var.B),
+                       desvio_padrao=c(P.ds.A, P.ds.B),
+                       mediana=c(P.mediana.A, P.mediana.B),
+                       IC_inf=c(P.IC.A_inf, P.IC.B_inf),
+                       IC_sup=c(P.IC.A_sup, P.IC.B_sup)), 4)
+
+row.names(tab.Pred) = c("Predicao A", "Predicao B")
+tab.Pred
+```
+
+  Logo, assim como para as distribuições _a posteriori_, vemos pelo gráfico e pela tabela que as funções preditivas são praticamente as mesmas, apresentando uma diferença de alguns meses entre elas.
+  Portanto, o modelo para a idade de empresas que já são bem antigas, fica dado pela função preditora indicada acima, cujo valor esperado é, em média , 280 anos, desvio padrão de 280 anos também, mediana de 194 anos e intervalo de confiança 95% de 7 a 1035 anos, além de uma curva característica próxima da curva dada pela distribuição exponencial.

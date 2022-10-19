@@ -1,0 +1,271 @@
+---
+title: "SME0809 - Inferência Bayesiana"
+output: pdf_document
+---
+
+#### Nome: Juan Lucas Montanaro, nºUSP: 11912787
+
+## Exercício 2 - Resposta
+
+
+  Primeiramente, o exercício é dividido em duas situações, a primeira com apenas uma medição da variável de interesse e a segunda com 100 medições, assim, visto que a primeira situação já foi feita em aula, vou continuar e resolver apenas a segunda situação.
+
+  Então, do enunciado tem-se que cada físico modelou a distribuição _a priori_ para $\mu$ como:
+
+- $\mu$~$N(900, 20^2)$, para o físico A; e
+- $\mu$~$N(900, 80^2)$, para o físico B.
+
+```{r distPri, echo=F}
+#--- Físico A------------
+# Priori mu ~ N(900,20^2)
+muA.pri <- 900
+dpA.pri <- 20
+
+#---Físico B-------------
+# Priori mu ~ N(900,80^2)
+muB.pri <- 900
+dpB.pri <- 80
+```
+
+### a) Faça um esboço do gráfico das distribuições _a priori_ dos dois físicos.
+```{r echo=F, fig.align='center'}
+#---Campo de variação para mu
+mu <- seq(600,1200,0.01)
+
+plot(mu, dnorm(mu,muA.pri,dpA.pri), type = "l",
+     col = "red", lty = 1, pch = 18,
+     xlab = expression(mu),
+     ylab = expression(pi(mu))
+     )
+
+lines(mu, dnorm(mu,muB.pri,dpB.pri), type = "l", 
+      col = "blue", pch = 19, lty = 1
+      )
+
+legend(610, 0.018, 
+       legend = c("Físico A", "Físico B"),
+       col = c("red","blue"), 
+       lty = 1:1, pch = c(18,19), cex = 0.8
+       )
+```
+
+### b) Encontre a distribuição _a posteriori_ para o físico A e para o físico B.
+
+  Em primeiro lugar, para atualizar a informação sobre a incerteza em relação a $\mu$, é necessário encontrar a função de verossimilhança, $L(\mu|y)$. Assim, como Y ~ $N(\mu, 40^2)$ e foi coletada uma amostra aleatória de Y de tamanho n, então:
+
+$$ L(\mu|y) = \prod_{i=1}^n \frac{ \exp(\frac{-1}{2.40^2}(y_i-\mu)^2) } { (2\pi.40)^\frac{-1}{2} } \propto \exp\Big(\frac{-1}{2.40^2}\sum_{i=1}^n(y_i-\mu)^2\Big) $$
+
+  E desenvolvendo $\sum_{i=1}^n(y_i-\mu)^2$, a expressão se resume em:
+
+$$ L(\mu|y) \propto \exp(-\frac{n}{2.40^2}(\mu-\overline{y})^2) $$
+
+  Desse modo, como $\mu$ ~ $N(900, \sigma_0^2)$ (sendo $\sigma_0=20$ para o físico A e $\sigma_0=80$ para o físico B), a distribuição _a posteriori_ é da forma:
+
+$$ \pi(\mu|y) \propto L(\mu|y) .\pi(\mu) \propto \\  \propto \exp\Big( -\frac{n}{2.40^2}(\mu-\overline{y})^2 \Big). \exp\Big( \frac{-1}{2\sigma_0^2}(\mu-900)^2 \Big) \propto \\  \propto \exp\Bigg( -\frac{n}{2.40^2}(\mu-\overline{y})^2 - \frac{1}{2\sigma_0^2}(\mu-900)^2 \Bigg) $$
+
+  E, como visto em aula, esta expressão pode ser escrita como:
+
+$$ \pi(\mu|y) \propto \exp(-\frac{1}{2} \bigg[\frac{n}{40^2}+\frac{1}{\sigma_0^2}\bigg] (\mu-c)^2) $$
+
+  Em que $c = \frac{1}{\frac{n}{40^2}+\frac{1}{\sigma_0^2}}\bigg(\frac{n.\overline{y}}{40^2}+\frac{900}{\sigma_0^2}\bigg)$. Portanto, $\mu|y$ ~ $N\Bigg(c, \frac{1}{\frac{n}{40^2}+\frac{1}{\sigma_0^2}}\Bigg)$.
+
+### c) Faça um esboço do gráfico das distribuições: _a priori_ e _a posteriori_ de cada um dos dois físicos.
+
+  Dadas as 100 medições de Y, temos que:
+```{r distPost}
+# Dados:
+y <- c(921.3429, 910.8055, 879.7302, 899.3456, 837.7587,
+       880.95, 830.4974, 856.1041, 777.5677, 983.3444,
+       981.048, 863.2836, 943.1702, 904.5064, 831.879, 
+       854.2947, 920.2139, 839.7896, 897.0014, 839.3796, 
+       872.4004, 884.6379, 892.7966, 897.9938, 840.228, 
+       823.2803, 903.4257, 798.5764, 862.5581, 938.8837, 
+       894.951, 871.0477, 863.9725, 857.6077, 856.3452, 
+       906.6818, 859.7368, 876.7236, 868.8648, 900.386, 
+       839.8117, 878.5936, 866.6935, 921.2941, 877.8528, 
+       897.6217, 894.6499, 830.6403, 935.6717, 948.9588,
+       888.0726, 788.6694, 877.4076, 863.1756, 982.6952,
+       934.724, 898.8038, 874.8416, 905.8379, 843.0447,
+       877.0727, 894.5569, 959.8427, 826.6365, 907.9904,
+       912.9051, 912.4662, 975.3224, 922.8291, 934.6569,
+       953.236, 833.5084, 842.0623, 885.3881, 918.0987,
+       842.0927, 875.6968, 826.3312, 870.4634, 866.2226,
+       845.4767, 914.2475, 922.4006, 832.359, 877.5627, 
+       887.8087, 879.4061, 925.3103, 877.6632, 877.3689,
+       854.1189, 904.5891, 882.893, 866.3494, 892.4554, 
+       908.3249, 873.6439, 914.1283, 879.8893, 843.1085
+       )
+sigma.dados <- 40
+n <- length(y)
+```
+
+  Resumindo, $n=100$, $\overline{y}=883.69$, $\mu$|y ~ $N(883.31, 3.92^2)$ para o físico A e $\mu$|y ~ $N(883.73, 3.99^2)$ para o físico B.
+
+  Veja o gráfico comparativo:
+
+```{r grafPost, echo=F, fig.align='center'}
+A <- n/sigma.dados^2
+a <- mean(y)
+
+
+# Funções para média e variância:
+mu.post <- function(A,a,B,b){
+  (1/(A+B)) * (A*a + B*b)
+}
+var.post <- function(A,B){
+  1/(A + B)
+}
+
+
+# ---- Físico A ----
+fis_A.B <- 1/dpA.pri^2
+fis_A.b <- muA.pri
+
+muA.post <- mu.post(A,a,fis_A.B,fis_A.b)
+varA.post <- var.post(A,fis_A.B)
+dpA.post <- sqrt(varA.post)
+
+# ---- Físico B ----
+fis_B.B <- 1/dpB.pri^2
+fis_B.b <- muA.pri
+
+muB.post <- mu.post(A,a,fis_B.B,fis_B.b)
+varB.post <- var.post(A,fis_B.B)
+dpB.post <- sqrt(varB.post)
+
+
+# ---- Gráficos ----
+plot(mu, dnorm(mu,muA.post,dpA.post), type = "l",
+     col = "dark red", lty = 2, lwd = 2,
+     xlab = expression(mu),
+     ylab = "", main = "Distribuições: ",
+     xlim = c(700, 1100)
+     )
+
+lines(mu, dnorm(mu,muA.pri,dpA.pri), type = "l", 
+     col = "red", lty = 1
+     )
+
+lines(mu, dnorm(mu,muB.post,dpB.post), type = "l",
+     col = "dark blue", lty = 2
+     )
+
+lines(mu, dnorm(mu,muB.pri,dpB.pri), type = "l", 
+     col = "blue", lty = 1
+     )
+
+legend(710, 0.09, 
+       legend = c("Priori Físico A", "Posteriori Físico A", 
+                  "Priori Físico B", "Posteriori Físico B"),
+       col = c("red", "dark red", "blue","dark blue"), 
+       lty = 1:2, cex = 0.8, lwd = c(2,1,1,1)
+       )
+```
+
+### d) Observando o gráfico, qual físico aprendeu mais com o experimento. Justifique.
+
+  **R.:** A partir do gráfico, quem mais aprendeu após observar os dados foi o físico B, pois seu primeiro modelo propunha que os possíveis valores do parâmetro estariam dispersos em um intervalo maior do que o do físico A, que propunha uma concentração maior dos dados. De fato, a linha azul do gráfico não apresenta uma concentração, ela cobre uma área grande em torno de $\mu = 900$ , diferente da linha azul escura, que concentra os dados em torno de $\mu =$ `r round(muB.post, 3)`. E o modelo do outro físico propunha uma concentração maior dos dados (a linha vermelha apresente um pico em $\mu = 900$). Logo, quem mais aprendeu foi o físico B.
+
+### e) Construa uma tabela que contenha o resumo _a priori_ e o resumo _a posteriori_.
+
+  Considere "IC95" como o intervalo de credibilidade 95% para o parâmetro, sendo "IC95.inf" e "IC95.sup" os limites inferior e superior, respectivamente.
+  Então, este é o resumo para o físico A:
+```{r tabPriPost-A, echo=F, fig.align='center'}
+e.A <- round(c(muA.pri, muA.post), 4)
+dp.A <- round(c(dpA.pri, dpA.post), 4)
+var.A <- round(dp.A^2, 4)
+
+ic.A <- round(c(qnorm(0.025, muA.pri, dpA.pri),
+                qnorm(0.025, muA.post, dpA.post)), 4)
+
+sc.A <- round(c(qnorm(0.925, muA.pri, dpA.pri),
+                qnorm(0.925, muA.post, dpA.post)), 4)
+
+resumo.A <- data.frame(media = e.A,
+                       desvio_padrao = dp.A,
+                       variancia = var.A,
+                       IC95.inf = ic.A,
+                       IC95.sup = sc.A
+                       )
+
+row.names(resumo.A) <- c("Priori", "Posteriori")
+
+resumo.A
+```
+  E este é o resumo para o físico B:
+```{r tabPriPost-B, echo=F, fig.align='center'}
+e.B <- round(c(muB.pri, muB.post), 4)
+dp.B <- round(c(dpB.pri, dpB.post), 4)
+var.B <- round(dp.A^2, 4)
+
+ic.B <- round(c(qnorm(0.025, muB.pri, dpB.pri),
+                qnorm(0.025, muB.post, dpB.post)), 4)
+
+sc.B <- round(c(qnorm(0.925, muB.pri, dpB.pri),
+                qnorm(0.925, muB.post, dpB.post)), 4)
+
+resumo.B <- data.frame(media = e.B,
+                       desvio_padrao = dp.B,
+                       variancia = var.B,
+                       IC95.inf = ic.B,
+                       IC95.sup = sc.B
+                       )
+
+row.names(resumo.B) <- c("Priori", "Posteriori")
+
+resumo.B
+```
+
+### f) Encontre as distribuições preditivas e faça um esboço de seus gráficos.
+
+  **R.:** Segundo Ricardo Ehlers (página 14), neste caso, para encontrar as distribuições preditivas podemos usar o fato de que Y pode ser fatorado da seguinte forma:
+    $Y = \mu + \epsilon$, em que $\epsilon$ ~ N(0, $40^2$); e
+    $\mu = m + w$, em que $w$ ~ N(0, $\sigma^2$), $m = E(\mu)$ e $\sigma^2 = Var(\mu)$.
+
+  Dessa forma, Cov($\mu, \epsilon$) = Cov($m, w$) = 0, o que implica independência para distribuições normais; portanto, Y é a soma de duas distribuições normais independentes, ou seja, Y ~ N($m$, $40^2+\sigma^2$).
+
+  Substituindo os valores de $m$ e $\sigma$ tanto para as distribuições preditivas  _a priori_ quanto para as _a posteriori_, obtemos que:
+
+```{r const, echo = F}
+#Y ~ N(900, 40^2 + 20^2 ou 80^2)
+
+sigA.pri <- round(sqrt(sigma.dados^2 + dpA.pri^2), 3)
+sigB.pri <- round(sqrt(sigma.dados^2 + dpB.pri^2), 3)
+sigA.post <- round(sqrt(sigma.dados^2 + varA.post), 3)
+sigB.post <- round(sqrt(sigma.dados^2 + varB.post), 3)
+```
+
+- para o físico A: $Y_{pri}$ ~ N(900, `r sigA.pri`$^2$) e $Y_{post}$ ~ N(`r round(muA.post,2)`, `r sigA.post`$^2$);
+- para o físico B: $Y_{pri}$ ~ N(900, `r sigB.pri`$^2$) e $Y_{post}$ ~ N(`r round(muB.post,2)`, `r sigB.post`$^2$).
+    
+  Veja os gráficos:
+
+```{r grafPred, echo = F, fig.align='center'}
+
+par(mfrow = c(1,2))
+plot(mu, dnorm(mu, muA.pri, sigA.pri), 
+     xlab = "y", ylab = "p(y)",
+     main = "Dist. Preditivas a Priori",
+     type = "l", col = "green", ylim = c(0, 0.010)
+     )
+lines(mu, dnorm(mu, muB.pri, sigB.pri), type = "l",
+     col = "dark green")
+legend(610, 0.0091, cex = 0.6,
+       legend = c("Físico A", "Físico B"), 
+       col = c("green", "dark green"), lty = 1:1
+       )
+
+plot(mu, dnorm(mu, muA.post, sigA.post), 
+     xlab = "y", ylab = "p(y)",
+     main = "Dist. Preditivas a Posteriori",
+     type = "l", col = "green", lwd = 2,
+     xlim = c(600, 1200)
+     )
+lines(mu, dnorm(mu, muB.post, sigB.post), type = "l",
+     col = "dark green")
+legend(610, 0.0091, cex = 0.6,
+       legend = c("Físico A", "Físico B"),
+       col = c("green", "dark green"),
+       lty = 1:1, lwd = 2:1
+       )
+```

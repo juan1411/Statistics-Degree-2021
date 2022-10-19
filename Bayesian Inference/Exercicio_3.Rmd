@@ -1,0 +1,100 @@
+---
+title: "SME0809 - Inferência Bayesiana"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+---
+
+#### Nome: Juan Lucas Montanaro, nºUSP: 11912787
+
+## Exercício Distribuição de Poisson - Resposta
+
+  Considerando-se $Y_1, Y_2, ..., Y_n$ uma a.a. de $Y$ ∼ $Poisson(\theta)$ pede-se:
+  
+### a) Encontre a distribuição _a priori_ não informativa de Jeffreys.
+
+  Pelo enunciado, têm-se que: $f_Y(y) = \frac{e^{-\theta}\theta^y}{y!}$;
+  Assim:
+$$\log{f_Y(y)} = -\theta + y\log{\theta}-\log{y!};$$
+$$\frac{d}{d\theta}\log{f_Y(y)} = -1 + \frac{y}{\theta};$$
+$$\frac{d^2}{d\theta^2}\log{f_Y(y)} = -\frac{y}{\theta^2};$$
+  Logo, a informação de Fisher de $Y$, $J(\theta)$, é:
+$$J(\theta) = -E\Big( \frac{d^2}{d\theta^2}\log{f_Y(y)} \Big) = \frac{E(Y)}{\theta^2} = \frac{\theta}{\theta^2} = \frac{1}{\theta}.$$
+  Portanto, como $\pi(\theta) \propto J(\theta)^{1/2}$, então a distribuição _a priori_ não informativa de Jeffreyes é $\pi(\theta) \propto \sqrt{\frac{1}{\theta}}$.
+  
+### b) A função de verossimilhança na parametrização θ muda em locação e escala?
+
+  Primeiramente, a função de verossimilhança de $Y$ com $\theta$ desconhecido é:
+$$L(\theta) = \prod^n_{i=1} \frac{e^{-\theta} \theta^{y_i}}{y_i!} \propto  e^{-n\theta} \theta^{n \overline{y}}$$
+  Veja que então a verossimilhança tem distribuição $Gama(n\overline{y}+1, n)$; dessa forma, para diferentes valores de $\theta$, obtém-se os seguintes gráficos:
+  
+```{r plotVero}
+t <- seq(0, 30, 0.01) #theta
+n <- 30
+yb <- c(5, 15, 25) #y barra
+
+# Gráficos:
+par(mar= c(4,4,4,4))
+
+plot(t, dgamma(t, n*yb[1]+1, n),
+     ylab=expression(L(theta)),
+     xlab=expression(theta),
+     type= "l")
+
+par(new=T)
+plot(t, dgamma(t, n*yb[2]+1, n),
+     type= "l", axes=F,
+     frame=T, ann=F, col=2)
+
+par(new=T)
+plot(t, dgamma(t, n*yb[3]+1, n),
+     type= "l", axes= F,
+     frame=T, ann=F, col=3)
+
+axis(4, col.axis=3, col=3)
+mtext(expression(L(theta)),
+      side=4, line=3, col=3)
+```
+
+  Portanto, de acordo com o gráfico, na parametrização $\theta$ a função de verossimilhança muda em locação e em escala.
+  
+### c) Caso a resposta do item b) seja afirmativa, encontre a escala na qual a função de verosimilhança mude somente em locação.
+
+  Como visto em aula, para encontrar a escala em que a função de verossimilhança muda apenas em locação precisamos da integral da distribuição _a priori_. Então seja $\phi$ a nova escala; assim:
+  
+$$\phi = \int\pi(\theta)d\theta \propto \int\sqrt{\frac{1}{\theta}}d\theta \propto \sqrt{\theta}$$
+  
+  E, para encontrar a distribuição de $\phi$:
+  
+$$F_\phi(p) = P(\phi<p) = P(\sqrt{\theta}<p) = P(\theta<p^2) = F_\theta(p^2);$$
+  Em que $p>0$, $F_\phi(p)$ é a função densidade acumulada de $\phi$ no ponto $p$ e $F_\theta(p^2)$ é a função densidade acumulada de $\theta$ no ponto $p^2$; logo:
+
+$$\frac{d}{dp}F_\phi(p) = f_\phi(p) = \frac{d}{dp}F_\theta(p^2) = f_\theta(p^2)2p.$$
+  
+  Portanto, $f_\phi(p)=f_\theta(p^2)2p$ é a função de distribuiçaõ de $\phi = \sqrt{\theta}$ e, nesta escala, a função de verossimilhança muda apenas em locação. Confira o gráfico comparativo:
+  
+```{r plotVeroPhi}
+# Gráficos:
+p <- sqrt(t) #phi
+
+par(mar = c(4,4,4,4))
+
+plot(p, dgamma(p^2, n*yb[1]+1, n)*2*p,
+     ylab=expression(L(phi)),
+     xlab=expression(phi),
+     xlim=c(1.7,5.3), type= "l")
+
+par(new=T)
+plot(p, dgamma(p^2, n*yb[2]+1, n)*2*p,
+     type= "l", axes=F, xlim=c(1.7,5.3),
+     frame=T, ann=F, col=2)
+
+par(new=T)
+plot(p, dgamma(p^2, n*yb[3]+1, n)*2*p,
+     type= "l", axes= F, xlim=c(1.7,5.3),
+     frame=T, ann=F, col=3)
+
+axis(4, col.axis=3, col=3)
+mtext(expression(L(phi)),
+      side=4, line=3, col=3)
+```

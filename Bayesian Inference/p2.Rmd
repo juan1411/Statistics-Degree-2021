@@ -1,0 +1,758 @@
+---
+title: "SME0809 - Inferência Bayesiana"
+output: 
+  pdf_document: 
+    keep_tex: yes
+---
+
+### Nome: Juan Lucas Montanaro, nºUSP: 11912787
+### Professora: Roseli Leandro Aparecida
+### 14 de Dezembro de 2021
+
+# Prova 2 - Parte Prática
+
+## Sumário
+*  Introdução
+*  Metodologia
+*  Análise Exploratória
+*  Amostragem
+*  Resultados
+*  Conclusão
+*  Códigos
+   *  Análise exploratória
+   *  Amostragem
+   *  Resultados
+   *  Conclusão
+*  Referências
+  
+
+## Introdução
+
+O tema presente na últimas aulas da matéria foi "simulação de amostras para estimação dos parâmetros", mas também foi visto a teoria sobre modelos hierárquicos, desta forma, decidi então seguir a recomendação da professora e trabalhar com um conjunto de dados que pode ser encontrado no volume 2 de exemplos do software _Open Bugs_.
+
+Os dados em questão se referem ao valor da circunferência do tronco de cinco laranjeiras em períodos de tempo diferentes. Contudo, não foi possível encontrar quais eram as unidades das variáveis, então ao longo do texto e nas legendas dos gráficos serão usados termos genéricos como "tamanho" e "tempo", para, respectivamente, o valor da circunferência dos troncos e a quantidade de tempo decorrida desdo marco zero até quando a medida foi tomada.
+
+Ademais, o modelo proposto, que será mais detalhado na próxima seção, tenta ajustar uma curva para prever o tamanho dos troncos a cada período de tempo e esta foi uma das peculiaridades que me fizeram escolher este tema, pois achei interesse o fato de ser possível usar métodos bayesianos em problemas ecológicos, logo, já tinha a minha motivação pessoal e só precisava começar a elaborar os códigos e a redação deste relatório.
+
+
+## Metodologia
+
+Então, em primeiro lugar, é preciso explicar o modelo não linear proposto no livro de exemplos. Assim, para $X_j$, $j=1,2,...,7$, o valor do tempo e cada $Y_ij$, $i=1,2,...,5$, o tamanho da circunferência da laranjera $i$ no tempo $j$, foi considerada uma curva de crescimento logística, resultando em:
+
+$$Y_{ij}|\eta_{ij},\sigma^2_C \sim N(\eta_{ij}, \sigma^2_C) \ \text{, em que } \ \eta_{ij} = \frac{\phi_{i1}}{1 + \phi_{i2}.exp(\phi_{i3}X_j)}.$$ 
+
+E, lembrando que este é um modelo hierárquico, temos que as distribuições _a priori_ dos parâmetros considerados são:
+
+$$\sigma^2_C \sim Inv-Gama(0.001, 0.001); \\                               \theta_{i1} = log(\phi_{i1}) \\                                               \theta_{i2} = log(\phi_{i2} +1) \\                                             \theta_{i3} = log(-\phi_{i3}); \\                                            \text{em que cada }\theta_{ik}|\mu_k,\sigma^2_k \sim N(\mu_k, \sigma^2_k), \ k=1,2,3.$$
+
+Por fim, as distribuições dos hiperparâmetros são dadas por:
+
+$$\mu_k \sim N(0, 0.0001) \ e \ \sigma^2_k \sim Inv-Gama(0.001, 0.001), \ k=1,2,3.$$
+
+Porém, como serão usados métodos computacionais, foi feita a mudança: $\frac{1}{\sigma^2} = \tau$, e dessa forma, temos que:
+
+$$\tau_h \sim Gama(0.001, 0.001),\text{ para }  h = 1,2,3 \text{ e } h=C.$$
+
+Além disso, como é explicado no livro, cada árvore é independente de outra, os parâmetros $\eta_{ij}$ e $\sigma^2_C$ também podem ser considerados independentes, assim como os hiperparâmetros $\mu_k$ e $\sigma^2_k$. Ou seja, são boas condições para a aplicação dos algoritmos de amostragem.  
+
+Inclusive, em segundo lugar, no livro o algoritmo usado para amostragem das distribuições _a posteriori_'s de $\sigma^2_C$ e $\theta_{ik}, \mu_k$ e $\sigma^2_k$, para $k=1,2,3$, foi o "Metropolis hibrído", entretanto, decidi que seria mais fácil usar o tradicional algoritmo visto durante as aulas, o amostrador de Gibbs, já implementado na linguagem _R_.
+
+Logo, além da análise do conjunto de dados, do modelo e das distribuições _a posteriori_'s, este relatório também estará comparando os resultados obtidos pelos dois algoritmos.
+
+
+## Análise Exploratória
+
+Antes de realmente ser feita a simulação e obtenção das amostras, é fundamental realizar uma análise exploratória do conjunto de dados, e é justamente o que será feito a seguir; começando por carregar os dados.
+
+```{r VED}
+# Carregando os Dados
+#setwd("C:/Juan - Usp/4º Semestre/Inferência Bayesiana")
+data <- read.csv("Dados - Orange Trees.csv", header=T, sep=";")
+data
+```
+
+Veja que não temos tantas medições, ainda assim, os intervalos entre cada tempo parecem aproximadamente idênticos, igual ao crescimento de cada laranjeira, elas estão aumentando aproximadamente no mesmo ritmo. Mas, para melhor visualização, podemos ver o gráfico de dispersão "tempo versus tamanho", apenas será feita uma coversão dos dados para o formato longo, i.e., uma coluna com cada valor do tempo, outra com uma indicação do e qual tempo é, mais uma coluna com a medida do tamanho e, finalmente, uma com a indicação de qual é a laranjeira.
+
+```{r SLA, message=FALSE, warning=FALSE}
+# Convertendo para o formato Longo
+require(tidyverse)
+
+X <- data[,1]
+Y <- as.data.frame(t(data[, 2:6]))
+Y$id <- 1:nrow(Y)
+cnames <- paste0("T", 1:(ncol(Y)-1))
+colnames(Y) <- c(cnames, "Laranjeira")
+
+data_long <- Y %>% select("Laranjeira", all_of(cnames)) %>%
+             pivot_longer(cols=all_of(cnames),
+                          names_to="Tempo_valor",
+                          values_to="Tamanho") %>%
+             mutate(Tempo = str_extract(Tempo_valor, "\\d+"),
+                    Tempo = as.factor(Tempo))
+
+data_long$Tempo_valor <- rep(X, nrow(Y))
+head(data_long, 10)
+```
+
+Agora, com os dados ajeitados, vejamos o gráfico de dispersão.
+
+```{r graf.Disp, fig.align='center'}
+# Grafico de dispersao
+cores_L <- c('#ffc266','#ffa366','#ff751a','#b34700','#663d00')
+  
+ggplot(data_long, aes(x=Tempo_valor, y=Tamanho, colour=factor(Laranjeira))) +
+  geom_point(size = 3) + theme_minimal() + labs(colour = 'Laranjeira') +
+  ggtitle('Tempos versus Tamanhos da Circunferências dos Troncos') +
+  scale_color_manual(values = cores_L)
+```
+
+Percebemos, então, que os tempos estão de fato quase igualmente espaçados, mas o crescimento de cada larnajeira não exatamente parecido: duas crescem menos, outras duas crescem mais e uma está na média, além disso, a variabilidade aumenta com o tempo e um ajuste linear realmente parece não se encaixar a tendência dos dados.
+
+```{r maisGraf, fig.align='center', message=FALSE, warning=FALSE}
+# Graficos com ajustes lineares
+ggplot(data_long, aes(x=Tempo_valor, y=Tamanho, colour=factor(Laranjeira))) +
+  geom_smooth(se = F, method = lm, formula = y~x) +
+  labs(colour = '    Retas \nAproximada') +
+  geom_point(size = 3) + xlab('Tempo') + theme_minimal() + 
+  ggtitle('Modelo Linear para cada Laranjeira') +
+  scale_color_manual(values = cores_L)
+```
+
+Veja como as retas não se ajustam muito bem aos dados, se fosse feita uma análise dos resíduos, veríamos como a variabilidade não está de acordo com o modelo linear, como é possível ver pelo gráfico a seguir.
+
+```{r graf.Var, fig.align='center'}
+# Boxplot dos tamanhos no tempo
+ggplot(data_long, aes(x=Tempo, y=Tamanho)) +
+  geom_boxplot(width=0.5, outlier.colour="red", fill = '#ff6600') +
+  ggtitle('Variabilidade do Tamanho dos Troncos das Laranjeiras') + 
+  theme_minimal()
+```
+
+A partir do gráfico, vemos que o crescimento realmente não parece ser linear (principalmente observando os valores médios de cada tempo) e a variabilidade poderia atrapalhar ainda mais. Portanto, a proposta de um modelo não linear esta de acordo com as características dos dados, veremos agora quanto aos valores do seus parâmetros.
+
+
+## Amostragem
+
+Como explicado, para encontrar os valores dos parâmetros da curva de crescimento logística serão construídas amostras utilizando o algoritmo amostrador de Gibbs. Visto que está sendo usado a linguangem _R_ e o algoritmo não será implementado do zero, estará sendo também usado uma biblioteca auxiliar, chamada `R2OpenBUGS`, cuja principal funcionalidade é justamente construir cadeias de Markov.
+
+Assim, para utilizar corretamente a biblioteca é preciso carregá-la no ambiente de trabalho. Depois, o próximo passo é definir uma função com a estrutura do modelo, que será seguida para gerar as amostras, então o modelo é salvo em um arquivo em texto.
+
+```{r modelo, message=FALSE, warning=FALSE}
+set.seed(2021) # def. uma semente em prol da reprodutibilidade
+require(R2OpenBUGS)
+
+# Criacao do modelo nao linear hierarquico
+modelo <- function(){
+  for (i in 1:nRow) {
+	  for (j in 1:nCol) {
+	    # Def. fdp para o tamanho de cada laranjeira, Y_i, no tempo X_j
+		  Y[i, j] ~ dnorm(eta[i, j], tau.C)
+			eta[i, j] <- phi[i, 1] / (1 + phi[i, 2] * exp(phi[i, 3] * X[j]))
+	  }
+    
+    # Def. valores auxiliares de eta_ij
+		phi[i, 1] <- exp(theta[i, 1])
+		phi[i, 2] <- exp(theta[i, 2]) - 1
+		phi[i, 3] <- -exp(theta[i, 3])
+		
+		# Def. cada fpd de theta
+		for (k in 1:3) {
+			theta[i, k] ~ dnorm(mu[k], tau[k])
+		}
+  }
+  
+  # Def. fdp de sigma^2 de Y_ij
+	tau.C ~ dgamma(1.0E-3, 1.0E-3)
+	sigma.C <- 1 / sqrt(tau.C)
+	
+	# Def. fdp do hiperparametros de theta
+	for (k in 1:3) {
+		mu[k] ~ dnorm(0, 1.0E-4)
+		tau[k] ~ dgamma(1.0E-3, 1.0E-3)
+		sigma[k] <- 1 / sqrt(tau[k])
+	}
+}
+
+# Salvando o arquivo do modelo
+mod <- file.path(getwd(), "mod.txt")
+write.model(modelo, mod)
+cat("Modelo criado e salvo.")
+```
+
+Todos esses passos são importantes para utilizar o software estatístico _Open Bugs_ dentro de um ambiente na linguagem _R_. Mas, finalmente, tem-se que definir: os parâmetros e hiperparâmetros iniciais, as vaiáveis usadas no modelo, os valores de quais parâmetros deseja-se guardar e finalmente o número de iterações, o tamanho da cadeia.
+
+```{r mcmc, message=FALSE, warning=FALSE, results='hide'}
+# Dados necessarios para o modelo
+data_mcmc <- list(nCol = ncol(Y)-1, nRow = nrow(Y), X = X,
+                  Y = t(t(Y[,1:7]))
+                  #transformacao forcada de 'list' para 'integer'
+                  )
+
+# Parametros a serem salvos
+params <- c('theta', 'mu', 'sigma', 'sigma.C')
+
+# Valores inicias para os parametros:
+inic.A <- list(mu=c(5, 2, -6), tau=c(20, 20, 20), tau.C=20,
+      theta=structure(
+            .Data = c(5,  5,  5,  5,  5,
+					            2,  2,  2,  2,  2,
+					           -6, -6, -6, -6, -6),
+				    .Dim = c(5, 3)) 
+		           )
+
+inic.B <- list(mu=c(3, 1, -1), tau=c(2, 2, 2), tau.C=2,
+      theta=structure(
+            .Data = c( 3,  3,  3,  3,  3,
+					             1,  1,  1,  1,  1,
+					            -1, -1, -1, -1, -1), 
+		        .Dim = c(5, 3))
+		           )
+
+inic.C <- list(mu=c(4, 3, -4), tau=c(11, 11, 11), tau.C=11,
+      theta=structure(
+            .Data = c( 4,  4,  4,  4,  4,
+					             3,  3,  3,  3,  3,
+					            -4, -4, -4, -4, -4), 
+		        .Dim = c(5, 3))
+		           )
+
+inic <- list(inic.A, inic.B, inic.C)
+
+# Construindo as cadeias
+saida <- bugs(data_mcmc, inic, params, mod,
+              codaPkg=T, n.chains=3, n.iter=30000,
+              n.burnin=25000, n.thin=15, debug=F)
+
+saida.coda <- read.bugs(saida)
+cat("Amostras simuladas.")
+```
+
+Perceba que, então, foi decido criar-se três cadeias de tamanho 450.000, aplicar um espaçamento de 15 números (ou seja, a cada 17 números, deletam-se todos exceto o primeiro e o último), resultando em cadeias de tamanho 30.000, e queimar-se o 25.000 valores iniciais, de forma que as cadeias salvas têm apenas 5.000 valores.
+
+Ademais, é essencial analisar a convergência destas cadeias, para isso, vamos utilizar outra biblioteca, complementar da anterior, chamada `coda`, com várias funções relacionadas às amostra feitas pelo Monte Carlos e cadeias markovianas. E o critério de convergência usado será o _"Gelman-Rubin"_, o qual indica uma possível convergência se o valor da estatística proposta por eles estiver perto de 1.
+
+```{r diags, message=FALSE, warning=FALSE}
+# Analise de convergencia
+require(coda)
+gelman.diag(saida.coda)
+```
+
+Como é possível observar, pode-se dizer que há indicações de que as cadeias convergiram, porém, é fundamental analisar também os gráficos de autocorrelação, densidade, traço e média ergódica para decidir-se sobre a utilidade destas cadeias como amostras.
+
+Dessa forma, poderia-se fazer cada gráfico separado utilizando funções da biblioteca `coda`, mas seria improdutivo, então, assim como apresentado pela professora, será utilizado mais uma última biblioteca, a `mcmcplots`, cuja única função é criar um arquivo html com todos os gráficos mencionados.
+
+Logo, veja a seguir todos os gráficos mencionados para os hiperparâmetros, o parâmetro $\sigma_C$ e a deviance.
+
+![](grafs_files/deviance.png) ![](grafs_files/sigma.C.png)
+![](grafs_files/mu_1.png) ![](grafs_files/sigma_1.png)
+![](grafs_files/mu_2.png) ![](grafs_files/sigma_2.png)
+![](grafs_files/mu_3.png) ![](grafs_files/sigma_3.png)
+
+Perceba que, de modo geral, os gráficos de autocorrelação se aproximam de zero (infelizmente, apenas para lags maiores do que 8 aproximadamente), as densidades parecem ter convergido para curvas semelhantes, as médias ergódicas estão tendendo para os mesmo valores e os gráficos de traço estão bem comportados, ou seja, as cadeias eventualmente convergem, mas, pelos gráficos de autocorrelação, elas apenas precisam de um alto espaçamento para se tornarem amostras independentes. 
+
+Por outro lado, talvez um dos maiores problemas desta amostragem seja o alto valor do _DIC_ (no caso, abreviado apenas para "deviance"), o qual pode estar indicando que este não é um bom modelo, ainda assim, estas é apenas uma análise dos parâmetros do modelo e não uma tentativa de modelar os dados, então vamos seguir adiante.
+
+Portanto, a partir da análise dos gráficos e da convergência, conclui-se que estas cadeias podem ser usadas para os resumos _a posteriori_ dos parâmetros do modelo.
+
+
+## Resultados
+
+Desta vez, neste tópico, será feita a análise fundamental da inferência bayesiana, a análise do resumo _a posteriori_ dos parâmetros, começando com as estatísticas pontuais (média, desvio padrão, mediana e 1º e 3º quartis).
+
+```{r resumo_1, message=FALSE, warning=FALSE}
+# Estatisticas pontuais
+
+# obtidas atraves de funcoes prontas
+resumo <- summary(saida.coda)
+media <- resumo$statistics[1:8, 1]
+d_padrao <- resumo$statistics[1:8, 2]
+erro_naive <- resumo$statistics[1:8, 3]
+erro_st <- resumo$statistics[1:8, 4]
+
+# obtidas atraves de "calculo"
+todas_cadeias <- rbind(saida.coda[[1]],
+                       saida.coda[[2]],
+                       saida.coda[[3]]
+                       )
+mediana <- NULL
+quartil_1 <- NULL
+quartil_3 <- NULL
+
+for (i in 1:8){
+  aux <- summary(todas_cadeias[, i])
+  quartil_1 <- c(quartil_1, aux[2])
+  mediana <- c(mediana, aux[3])
+  quartil_3 <- c(quartil_3, aux[5])
+}
+
+# tabela resumo
+estat_pontuais <- data.frame(media = media, dp = d_padrao, med = mediana,
+                             Quartil_1 = quartil_1, Quartil_3 = quartil_3,
+                             ep_naive = erro_naive, ep_st = erro_st
+                             )
+row.names(estat_pontuais) <- c('DIC', 'mu[1]', 'mu[2]', 'mu[3]',
+                               'sigma[1]', 'sigma[2]', 'sigma[3]', 
+                               'sigma.C')
+colnames(estat_pontuais) <- c('Média', 'Des. Padrão', 'Mediana',
+                              '1º Quartil', '3º Quartil', 'EP Naive',
+                              'EP Série-Temporal')
+round(t(estat_pontuais), 4)
+```
+
+Em primeiro lugar, temos que os erros padrões em séries temporais são bem baixos e próximos dos erros padrões Naives, indicando que a autocorrelação nas amostras não é forte.
+
+Além disso, veja como, fixado um dos hiperparâmetros, praticamente todas as estatística estão com os valores semelhantes, diferindo em algumas casas decimais, indicando que provavelmente foram encontradas boas aproximações para os parâmetros.
+
+Assim, para reafirmar esta hipótese, vejamos com estão as estatísticas intervalares (intervalo de credibilidade - IC - e intervalo _a posteriori_ de densidade máxima - HPD) ao nível de confiança 95%.
+
+```{r resumo_2, message=FALSE, warning=FALSE}
+# Estatisticas intervalares
+
+ic_inf <- resumo$quantiles[1:8, 1]
+ic_sup <- resumo$quantiles[1:8, 5]
+hpd_inf <- HPDinterval(mcmc(todas_cadeias), prob = 0.95)[1:8, 1]
+hpd_sup <- HPDinterval(mcmc(todas_cadeias), prob = 0.95)[1:8, 2]
+
+# tabela resumo 2
+estat_int <- data.frame(IC_2.5 = ic_inf, IC_97.5 = ic_sup,
+                        HPD_2.5 = hpd_inf, HPD_97.5 = hpd_sup
+                        )
+row.names(estat_int) <- c('DIC', 'mu[1]', 'mu[2]', 'mu[3]',
+                          'sigma[1]', 'sigma[2]', 'sigma[3]', 
+                          'sigma.C')
+colnames(estat_int) <- c('IC 2.5%', 'IC 97.5%',
+                         'HPD 2.5%', 'HPD 97.5%')
+round(t(estat_int), 4)
+```
+
+De fato, as amplitudes dos intervalos estão bem pequenas, corroborando com a hipótese dos valores estarem corretos. Inclusive, existe uma diferença mínima entre os dois intervalos, uma boa indicativa de que as distribuições destes hiperparâmetros estão centradas no valor médio, ou seja, uma boa aproximação para os hiperparâmetros é o próprio valor médio.
+
+Entretanto, veja que na verdade, o parâmentro $\sigma_C$ foge um pouco às observações anteriores, muito provavelmente porque seus valores são mais influênciados pelos verdadeiros valores de $Y$, i.e., sua distribuição _a posteriori_ está mais diretamente ligada ao valor da função de verossimilhança, e, como temos relativamente poucas observações, logo, a densidade do parâmetro é mais variável.
+
+Agora, deveria-se comentar sobre os parâmetros $\phi$ ou $\theta$, pois são eles que determinam a forma da curva não linear que esta sendo ajustada, mas segundo o livro de exemplos, os pesquisadores originalmente encontram valores para $\mu_k, \sigma_k \ e \ \sigma_C$ (para $k=1,2,3$) e voltam a simular amostras apenas para os três parâmetros $\theta$ (inclusive, usando outro algoritmo, o Metropolis-Hasting), o que deve reduzir muito a autocorrelação entre os valores.
+
+Contudo, analisando os resultados obtidos por eles e comparando com os obtidos neste relatório (a comparação será melhor detalhada adiante), decidi que não é necessário fazer novas simulações.
+
+Então, já com os resultados para os parâmetros $\theta$ obtidos, vamos repetir a mesma análise do resumo _a posteriori_; porém, como são cinco laranjeiras e três $\theta$'s, seria extremamente massante e repetitivo analisar todos, dessa forma, a análise será feita apenas para a terceira laranjeira, pois seus tamanhos de tronco se mostraram na média entre os outros. Primeiro, os gráficos de densidade, autocorrelação, média ergódica e traço.
+
+![](grafs_files/theta_31.png)
+![](grafs_files/theta_32.png)
+![](grafs_files/theta_33.png)
+
+Veja que, para três os parâmetros, as densidades das três amostras parecem convergir para a mesma curva, com pequenos erros pontuais, assim como o gráfico do traço, que também parece estável e apresenta pequenos erros pontuais. Porém a vemos que a média ergódica demora algumas iterações até começar a convergir, semelhante ao gráfico de autocorrelação, que se aproxima de zero apenas paa lags maiores do que 10. Ou seja, os valores as amostras podem ser consideradas válidas, mas veremos uma maior variabilidade no intervalo de valores possíveis.
+
+Dessa forma, vejamos como estão os resumos _a posteriori_ para os três parâmetros $\theta$.
+
+```{r resumo_3, message=FALSE, warning=FALSE}
+#Estatisticas pontuais
+
+media <- resumo$statistics[15:17, 1]
+d_padrao <- resumo$statistics[15:17, 2]
+e_naive <- resumo$statistics[15:17, 3]
+e_st <- resumo$statistics[15:17, 4]
+
+mediana <- NULL
+quartil_1 <- NULL
+quartil_3 <- NULL
+
+for (i in 15:17){
+  aux <- summary(todas_cadeias[, i])
+  quartil_1 <- c(quartil_1, aux[2])
+  mediana <- c(mediana, aux[3])
+  quartil_3 <- c(quartil_3, aux[5])
+}
+
+
+# Estatisticas intervalares
+
+ic_inf <- resumo$quantiles[15:17, 2]
+ic_sup <- resumo$quantiles[15:17, 5]
+hpd_inf <- HPDinterval(mcmc(todas_cadeias), prob = 0.95)[15:17, 1]
+hpd_sup <- HPDinterval(mcmc(todas_cadeias), prob = 0.95)[15:17, 2]
+
+# tabela resumo de theta
+tab <- data.frame(media = media, des_p = d_padrao, med = mediana,
+                  q_1 = quartil_1, q_3 = quartil_3, IC_ins = ic_inf,
+                  IC_sup = ic_sup, HPD_inf = hpd_inf, HPD_sup = hpd_sup,
+                  ep_Naive = e_naive, ep_st = e_st
+                  )
+rownames(tab) <- c('Theta[3,1]', 'Theta[3,2]', 'Theta[3,3]')
+  
+colnames(tab) <- c('Média', 'Des. Padrão', 'Mediana', '1º Quartil',
+                   '3º Quartil', 'IC 2.5%', 'IC 97.5%', 'HPD 2.5%',
+                   'HPD 97.5%', 'EP Naive', 'EP Série-Temporal')
+round(t(tab), 4)
+```
+
+Então, percebemos que na verdade, as estatísticas parecem se aproximarem de um mesmo valor, diferente do que havia sido suposto apenas analisando os gráficos, o que é excelente, considerando que queremos obter aproximações para os parâmetros. Inclusive, as amplitudes dos intervalos de credibilidade e HPD são bem pequenas, além de bem próximos, indicando que, como dito anteriormente, será possível usar a média como valor aproximado.
+
+Finalmente, para terminar este tópico, vamos considerar os resumos que constam no livro de exemplo, i.e., os resumos originais obtidos pelos pesquisadores.
+
+![](Estat_Originais.png)
+
+Não foi dito, mas na pesquisa original, foram feitas duas cadeias (uma para simular $\mu_k, \sigma_k \ e \ \sigma_C$, para $k=1,2,3$ e outra para encontrar os valores de $\theta_{ik}$, para $i=1,2,3,4,5$) de tamanho 10.000, em que queimaram-se os primeiros cinco mil valores. Enquanto que, neste relatório, as cadeias foram feitas com tamanhos muito maiores, como já explicado.
+
+Ainda assim, note que os resumos são bem semelhantes; os valores diferem a partir da segunda casa decimal, ou seja, mesmo usando outro algoritmo, com cadeias bem maiores foi possível obter resultados parecidos o suficiente (pois o erro entre as medidas é menor do que o _"MCMC_error"_, o qual representa o erro em fazer uma amostragem por simulação).
+
+
+## Conclusão
+
+Portanto, encontrados os parâmetros do modelo, vejamos como ficaram as curvas de crescimento ajustadas para cada laranjeira usando os valores médios obtidos.
+
+```{r funcaoGraf, include=FALSE}
+#Valores medios de theta's
+thetas <- resumo$statistics[9:23, 1]
+thetas <- matrix(thetas, ncol=5)
+
+# definicao da curva
+f <- function(dados, suporte_x){
+  theta <- thetas[, unique(dados$Laranjeira)]
+  #print(theta)
+  phi1 <- exp(theta[1])
+  phi2 <- exp(theta[2]) - 1
+  phi3 <- -exp(theta[3])
+  #print(phi1); print(phi2); print(phi3)
+  
+  eta <- phi1 / (1 + phi2*exp(phi3*suporte_x))
+  return(eta)
+}
+```
+
+```{r modAjust, fig.align='center'}
+# Grafico das curvas de crescimento
+x <- seq(100, 1900, 1)
+plot(data_long[1:7,]$Tempo_valor, data_long[1:7,]$Tamanho,
+     col=cores_L[1], xlim=c(100, 1800), ylim=c(20, 230), pch=19,
+     lwd=3, xlab='Tempo', ylab='Tamanho',
+     main=paste('Modelos Não Lineares Ajustados',
+                '\npara o Tamanho do Tronco de cada Laranjeira'))
+lines(f(data_long[1:7, ], x), type='l', col=cores_L[1])
+
+for (i in 2:5){
+  b <- 7*i
+  a <- b - 6
+  points(x=data_long[a:b,]$Tempo_valor, y=data_long[a:b, ]$Tamanho,
+         col=cores_L[i], pch=19, lwd=3)
+  lines(f(data_long[a:b, ], x), type='l', col=cores_L[i], lwd=2)
+}
+legend(90, 225, title='Curvas de Crescimento',
+       legend=c('1','2','3','4','5'), col=cores_L,
+       lwd=3, lty=1, pch=21, cex=0.9)
+```
+
+Primeiro, a função `f()` usada no código acima está escrita na seção de anexos. Segundo, perceba que as curvas paracem superestimar o crescimento, i.e., elas estão levemente acima dos pontos observados, podendo ser um erro vindo da estimação dos parâmetros, mas, se for considerado que a variância é bem alta ($\sigma_C^2 \approx 64.70$), então os pontos estariam entre os valores esperados. Na verdade, as características de ajuste do modelo não devem ser discutidas neste relatório.
+
+Logo, voltando a análise dos parâmetros, pode-se dizer que suas amostragem e estimações por método bayesianos foram consideravelmente precisas e eficientes, pois mesmo sendo considerados dois algoritmos, os resultados finais foram semelhantes e poucos cálculos manuais forma necessários para obter um bom resultado.
+
+
+## Anexos
+
+Esta é a primeira seção extra deste relatório, em que todos os códigos escritos ao longo dele serão reunidos, para facilitar o acesso. Lembrando que foi usada a linguagem _R_ e outras três bibliotecas: `tidyverse` - para alguns gráficos -, `R2OpenBUGS` - para amotragem - e `coda` - para análise das cadeias de Markov geradas; além de uma quarta biblioteca para a confecção dos principais gráficos para as amostras obtidas, chamada `mcmcplots`.
+
+### Análise Exploratória
+
+```{r allCode, eval=FALSE, include=TRUE}
+# Carregando os Dados
+#setwd("C:/Juan - Usp/4º Semestre/Inferência Bayesiana")
+data <- read.csv("Dados - Orange Trees.csv", header=T, sep=";")
+data
+
+# Convertendo para o formato Longo
+require(tidyverse)
+
+X <- data[,1]
+Y <- as.data.frame(t(data[, 2:6]))
+Y$id <- 1:nrow(Y)
+cnames <- paste0("T", 1:(ncol(Y)-1))
+colnames(Y) <- c(cnames, "Laranjeira")
+
+data_long <- Y %>% select("Laranjeira", all_of(cnames)) %>%
+             pivot_longer(cols=all_of(cnames),
+                          names_to="Tempo_valor",
+                          values_to="Tamanho") %>%
+             mutate(Tempo = str_extract(Tempo_valor, "\\d+"),
+                    Tempo = as.factor(Tempo))
+
+data_long$Tempo_valor <- rep(X, nrow(Y))
+head(data_long, 10)
+
+# Grafico de dispersao
+cores_L <- c('#ffc266','#ffa366','#ff751a','#b34700','#663d00')
+  
+ggplot(data_long, aes(x=Tempo_valor, y=Tamanho, colour=factor(Laranjeira))) +
+  geom_point(size = 3) + theme_minimal() + labs(colour = 'Laranjeira') +
+  ggtitle('Tempos versus Tamanhos da Circunferências dos Troncos') +
+  scale_color_manual(values = cores_L)
+
+# Graficos com ajustes lineares
+ggplot(data_long, aes(x=Tempo_valor, y=Tamanho, colour=factor(Laranjeira))) +
+  geom_smooth(se = F, method = lm, formula = y~x) +
+  labs(colour = '    Retas \nAproximada') +
+  geom_point(size = 3) + xlab('Tempo') + theme_minimal() + 
+  ggtitle('Modelo Linear para cada Laranjeira') +
+  scale_color_manual(values = cores_L)
+
+# Boxplot dos tamanhos no tempo
+ggplot(data_long, aes(x=Tempo, y=Tamanho)) +
+  geom_boxplot(width=0.5, outlier.colour="red", fill = '#ff6600') +
+  ggtitle('Variabilidade do Tamanho dos Troncos das Laranjeiras') + 
+  theme_minimal()
+```
+
+### Amostragem
+
+```{r allCode_2, eval=FALSE, include=TRUE}
+set.seed(2021) # def. uma semente em prol da reprodutibilidade
+require(R2OpenBUGS)
+
+# Criacao do modelo nao linear hierarquico
+modelo <- function(){
+  for (i in 1:nRow) {
+	  for (j in 1:nCol) {
+	    # Def. fdp para o tamanho de cada laranjeira, Y_i, no tempo X_j
+		  Y[i, j] ~ dnorm(eta[i, j], tau.C)
+			eta[i, j] <- phi[i, 1] / (1 + phi[i, 2] * exp(phi[i, 3] * X[j]))
+	  }
+    
+    # Def. valores auxiliares de eta_ij
+		phi[i, 1] <- exp(theta[i, 1])
+		phi[i, 2] <- exp(theta[i, 2]) - 1
+		phi[i, 3] <- -exp(theta[i, 3])
+		
+		# Def. cada fpd de theta
+		for (k in 1:3) {
+			theta[i, k] ~ dnorm(mu[k], tau[k])
+		}
+  }
+  
+  # Def. fdp de sigma^2 de Y_ij
+	tau.C ~ dgamma(1.0E-3, 1.0E-3)
+	sigma.C <- 1 / sqrt(tau.C)
+	
+	# Def. fdp do hiperparametros de theta
+	for (k in 1:3) {
+		mu[k] ~ dnorm(0, 1.0E-4)
+		tau[k] ~ dgamma(1.0E-3, 1.0E-3)
+		sigma[k] <- 1 / sqrt(tau[k])
+	}
+}
+
+# Salvando o arquivo do modelo
+mod <- file.path(getwd(), "mod.txt")
+write.model(modelo, mod)
+cat("Modelo criado e salvo.")
+
+# Dados necessarios para o modelo
+data_mcmc <- list(nCol = ncol(Y)-1, nRow = nrow(Y), X = X,
+                  Y = t(t(Y[,1:7]))
+                  #transformacao forcada de 'list' para 'integer'
+                  )
+
+# Parametros a serem salvos
+params <- c('theta', 'mu', 'sigma', 'sigma.C')
+
+# Valores inicias para os parametros:
+inic.A <- list(mu=c(5, 2, -6), tau=c(20, 20, 20), tau.C=20,
+      theta=structure(
+            .Data = c(5,  5,  5,  5,  5,
+					            2,  2,  2,  2,  2,
+					           -6, -6, -6, -6, -6),
+				    .Dim = c(5, 3)) 
+		           )
+
+inic.B <- list(mu=c(3, 1, -1), tau=c(2, 2, 2), tau.C=2,
+      theta=structure(
+            .Data = c( 3,  3,  3,  3,  3,
+					             1,  1,  1,  1,  1,
+					            -1, -1, -1, -1, -1), 
+		        .Dim = c(5, 3))
+		           )
+
+inic.C <- list(mu=c(4, 3, -4), tau=c(11, 11, 11), tau.C=11,
+      theta=structure(
+            .Data = c( 4,  4,  4,  4,  4,
+					             3,  3,  3,  3,  3,
+					            -4, -4, -4, -4, -4), 
+		        .Dim = c(5, 3))
+		           )
+
+inic <- list(inic.A, inic.B, inic.C)
+
+# Construindo as cadeias
+saida <- bugs(data_mcmc, inic, params, mod,
+              codaPkg=T, n.chains=3, n.iter=30000,
+              n.burnin=25000, n.thin=15, debug=F)
+
+saida.coda <- read.bugs(saida)
+cat("Amostras simuladas.")
+
+# Analise de convergencia
+require(coda)
+gelman.diag(saida.coda)
+
+# Principais graficos das amostras
+#require(mcmcplots)
+#mcmcplot(saida.coda)
+```
+
+### Resultados
+
+```{r allCode_3, eval=FALSE, include=TRUE}
+# Estatisticas pontuais
+
+# obtidas atraves de funcoes prontas
+resumo <- summary(saida.coda)
+media <- resumo$statistics[1:8, 1]
+d_padrao <- resumo$statistics[1:8, 2]
+erro_naive <- resumo$statistics[1:8, 3]
+erro_st <- resumo$statistics[1:8, 4]
+
+# obtidas atraves de "calculo"
+todas_cadeias <- rbind(saida.coda[[1]],
+                       saida.coda[[2]],
+                       saida.coda[[3]]
+                       )
+mediana <- NULL
+quartil_1 <- NULL
+quartil_3 <- NULL
+
+for (i in 1:8){
+  aux <- summary(todas_cadeias[, i])
+  quartil_1 <- c(quartil_1, aux[2])
+  mediana <- c(mediana, aux[3])
+  quartil_3 <- c(quartil_3, aux[5])
+}
+
+# tabela resumo
+estat_pontuais <- data.frame(media = media, dp = d_padrao, med = mediana,
+                             Quartil_1 = quartil_1, Quartil_3 = quartil_3,
+                             ep_naive = erro_naive, ep_st = erro_st
+                             )
+row.names(estat_pontuais) <- c('DIC', 'mu[1]', 'mu[2]', 'mu[3]',
+                               'sigma[1]', 'sigma[2]', 'sigma[3]', 
+                               'sigma.C')
+colnames(estat_pontuais) <- c('Média', 'Des. Padrão', 'Mediana',
+                              '1º Quartil', '3º Quartil', 'EP Naive',
+                              'EP Série-Temporal')
+round(t(estat_pontuais), 4)
+
+
+# Estatisticas intervalares
+
+ic_inf <- resumo$quantiles[1:8, 1]
+ic_sup <- resumo$quantiles[1:8, 5]
+hpd_inf <- HPDinterval(mcmc(todas_cadeias), prob = 0.95)[1:8, 1]
+hpd_sup <- HPDinterval(mcmc(todas_cadeias), prob = 0.95)[1:8, 2]
+
+# tabela resumo 2
+estat_int <- data.frame(IC_2.5 = ic_inf, IC_97.5 = ic_sup,
+                        HPD_2.5 = hpd_inf, HPD_97.5 = hpd_sup
+                        )
+row.names(estat_int) <- c('DIC', 'mu[1]', 'mu[2]', 'mu[3]',
+                          'sigma[1]', 'sigma[2]', 'sigma[3]', 
+                          'sigma.C')
+colnames(estat_int) <- c('IC 2.5%', 'IC 97.5%',
+                         'HPD 2.5%', 'HPD 97.5%')
+round(t(estat_int), 4)
+
+
+#Estatisticas pontuais
+
+media <- resumo$statistics[15:17, 1]
+d_padrao <- resumo$statistics[15:17, 2]
+e_naive <- resumo$statistics[15:17, 3]
+e_st <- resumo$statistics[15:17, 4]
+
+mediana <- NULL
+quartil_1 <- NULL
+quartil_3 <- NULL
+
+for (i in 15:17){
+  aux <- summary(todas_cadeias[, i])
+  quartil_1 <- c(quartil_1, aux[2])
+  mediana <- c(mediana, aux[3])
+  quartil_3 <- c(quartil_3, aux[5])
+}
+
+
+# Estatisticas intervalares
+
+ic_inf <- resumo$quantiles[15:17, 2]
+ic_sup <- resumo$quantiles[15:17, 5]
+hpd_inf <- HPDinterval(mcmc(todas_cadeias), prob = 0.95)[15:17, 1]
+hpd_sup <- HPDinterval(mcmc(todas_cadeias), prob = 0.95)[15:17, 2]
+
+# tabela resumo de theta
+tab <- data.frame(media = media, des_p = d_padrao, med = mediana,
+                  q_1 = quartil_1, q_3 = quartil_3, IC_ins = ic_inf,
+                  IC_sup = ic_sup, HPD_inf = hpd_inf, HPD_sup = hpd_sup,
+                  ep_Naive = e_naive, ep_st = e_st
+                  )
+rownames(tab) <- c('Theta[3,1]', 'Theta[3,2]', 'Theta[3,3]')
+  
+colnames(tab) <- c('Média', 'Des. Padrão', 'Mediana', '1º Quartil',
+                   '3º Quartil', 'IC 2.5%', 'IC 97.5%', 'HPD 2.5%',
+                   'HPD 97.5%', 'EP Naive', 'EP Série-Temporal')
+round(t(tab), 4)
+```
+
+### Conclusão
+
+```{r allCode_4, eval=FALSE, include=TRUE}
+#Valores medios de theta's
+thetas <- resumo$statistics[9:23, 1]
+thetas <- matrix(thetas, ncol=5)
+
+# definicao da curva
+f <- function(dados, suporte_x){
+  theta <- thetas[, unique(dados$Laranjeira)]
+  #print(theta)
+  phi1 <- exp(theta[1])
+  phi2 <- exp(theta[2]) - 1
+  phi3 <- -exp(theta[3])
+  #print(phi1); print(phi2); print(phi3)
+  
+  eta <- phi1 / (1 + phi2*exp(phi3*suporte_x))
+  return(eta)
+}
+
+# Grafico das curvas de crescimento
+x <- seq(100, 1900, 1)
+plot(data_long[1:7,]$Tempo_valor, data_long[1:7,]$Tamanho,
+     col=cores_L[1], xlim=c(100, 1800), ylim=c(20, 230), pch=19,
+     lwd=3, xlab='Tempo', ylab='Tamanho',
+     main=paste('Modelos Não Lineares Ajustados',
+                '\npara o Tamanho do Tronco de cada Laranjeira'))
+lines(f(data_long[1:7, ], x), type='l', col=cores_L[1])
+
+for (i in 2:5){
+  b <- 7*i
+  a <- b - 6
+  points(x=data_long[a:b,]$Tempo_valor, y=data_long[a:b, ]$Tamanho,
+         col=cores_L[i], pch=19, lwd=3)
+  lines(f(data_long[a:b, ], x), type='l', col=cores_L[i], lwd=2)
+}
+legend(90, 225, title='Curvas de Crescimento',
+       legend=c('1','2','3','4','5'), col=cores_L,
+       lwd=3, lty=1, pch=21, cex=0.9)
+```
+
+
+## Referências
+
+E, por fim, esta é a segunda e última seção, em que serão enumeradas todas as referências externas usadas na elaboração deste relatório.
+
+Livro de Exemplos do _Open Bugs_, vol.2: https://www.mrc-bsu.cam.ac.uk/wp-content/uploads/WinBUGS_Vol2.pdf
+
+_R_ - v.4.1.0: https://cran.r-project.org/doc/manuals/r-release/R-intro.html
+
+_tidyverse_ - v.1.3.0: https://www.tidyverse.org/packages/#core-tidyverse
+
+_ggplot2_ - faz parte do _tidyverse_ mas ele foi o mais usado; v.3.3.5: https://ggplot2.tidyverse.org/reference/index.html
+
+_R2OpenBUGS_ - v.3.2.1: https://cran.r-project.org/web/packages/R2OpenBUGS/R2OpenBUGS.pdf
+
+_coda_ - v.0.19-4: https://cran.r-project.org/web/packages/coda/coda.pdf
+
+_mcmcplots_ - v.0.4.3: https://cran.r-project.org/web/packages/mcmcplots/mcmcplots.pdf
+
