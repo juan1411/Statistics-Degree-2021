@@ -1,7 +1,5 @@
 """
 Lista 7
-Componentes do grupo :
-NUSP : 11912787
 
  Programa que simula um espaco 2D no qual o usuario eh
 capaz de, atravez de comandos digitados pelo terminal,
