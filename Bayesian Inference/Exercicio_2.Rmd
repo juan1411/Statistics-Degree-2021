@@ -3,7 +3,7 @@ title: "SME0809 - Inferência Bayesiana"
 output: pdf_document
 ---
 
-#### Nome: Juan Lucas Montanaro, nºUSP: 11912787
+#### Nome: Juan Lucas Montanaro
 
 ## Exercício 2 - Resposta
 
