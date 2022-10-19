@@ -5,8 +5,8 @@ output:
     keep_tex: yes
 ---
 
-### Nome: Juan Lucas Montanaro, nºUSP: 11912787
-### Professora: Roseli Leandro Aparecida
+### Nome: Juan Lucas Montanaro
+### Professora: ~~
 ### 14 de Dezembro de 2021
 
 # Prova 2 - Parte Prática
@@ -66,7 +66,7 @@ Antes de realmente ser feita a simulação e obtenção das amostras, é fundame
 
 ```{r VED}
 # Carregando os Dados
-#setwd("C:/Juan - Usp/4º Semestre/Inferência Bayesiana")
+#setwd("4º Semestre/Inferência Bayesiana")
 data <- read.csv("Dados - Orange Trees.csv", header=T, sep=";")
 data
 ```
