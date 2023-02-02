@@ -155,7 +155,7 @@ $$L(\lambda, t) = \prod_{i=1}^n f_T(t_i) = \prod_{i=1}^n \lambda e^{-\lambda t_i
 ```{r Data, message=FALSE, warning=FALSE}
 library(readxl)
 
-dados <- read_excel('4º Semestre/Inferência Bayesiana/P1/Oldest.xls',
+dados <- read_excel(paste0(getwd(), '/Bayesian Inference/Oldest.xls'),
                     sheet = 1)[, c(8, 10, 11, 12, 14, 17)]
 head(dados)
 ```
@@ -211,6 +211,8 @@ A.bet = sum(t) + 1
 
 B.alp = n
 B.bet = sum(t)
+
+par(mfrow=c(1,1))
 
 plot(l, dgamma(l, A.alp, A.bet), ylab = 'Densidades',
      type = 'l', xlab = expression(lambda), lwd = 2,
